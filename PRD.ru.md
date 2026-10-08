@@ -8,11 +8,12 @@
 | Слоган | Агентный IDE, который строит сам себя |
 | Статус | Активная разработка (ядро архитектуры стабильно; сценарии и поверхности ещё эволюционируют) |
 | Лицензия | MIT |
-| Последнее обновление | 2026-09-25 |
-| Основная дистрибуция | Desktop-приложение (рекомендуется macOS arm64; Linux AppImage — альфа), `npx bb-app@latest` / `@nightly` |
-| Сопутствующие поверхности | Web UI, CLI `bb`, TypeScript SDK / HTTP API, mobile (iOS early access), getbb.app (маркетинг + Connect) |
+| Последнее обновление | 2026-10-08 |
+| Базовая поставка | **0.45.0** (см. [CHANGELOG.md](CHANGELOG.md)); Nightly/`main` могут быть впереди |
+| Основная дистрибуция | Desktop-приложение (рекомендуется macOS arm64; Linux AppImage и Windows x64 installer — альфа), `npx bb-app@latest` / `@nightly` |
+| Сопутствующие поверхности | Web UI, CLI `bb`, TypeScript SDK / HTTP API, mobile (iOS TestFlight + Android APK альфа), getbb.app (маркетинг + Connect + Plugin Guide) |
 | Назначение документа | Зафиксировать продуктовый замысел, требования и границы на основе поставляемого кода и vision |
-| Связанные документы | [docs/VISION.md](docs/VISION.md), [docs/system-overview.md](docs/system-overview.md), [docs/repository-overview.md](docs/repository-overview.md), [docs/server-move-plan.md](docs/server-move-plan.md), [docs/forkable-plugins.md](docs/forkable-plugins.md), [README.md](README.md) |
+| Связанные документы | [docs/VISION.md](docs/VISION.md), [docs/system-overview.md](docs/system-overview.md), [docs/repository-overview.md](docs/repository-overview.md), [docs/platform-support.md](docs/platform-support.md), [docs/configuration.md](docs/configuration.md), [docs/server-move-plan.md](docs/server-move-plan.md), [docs/forkable-plugins.md](docs/forkable-plugins.md), [README.md](README.md), [CHANGELOG.md](CHANGELOG.md) |
 
 ---
 
@@ -40,10 +41,10 @@ bb — это **программируемое рабочее пространс
 
 - Заменять CLI провайдеров или владеть их auth (bb использует уже аутентифицированных провайдеров пользователя).
 - Требовать hosted cloud-аккаунт для базового локального использования (Connect и облачные плагины расширяют bb, но не заменяют локальный продукт).
-- Поставлять нативный Windows agent runtime (Windows поддерживается через Ubuntu на WSL2).
+- Считать native Windows или Android production-recommended платформами (оба поставляются как **альфа**; доверенные host-пути — WSL2 и macOS/Linux).
 - Делать телефон полноценным execution host (mobile — поверхность управления сервером bb).
-- Automatic failover или восстановление мёртвого сервера из бэкапа как основной путь переноса (v1 server move — плановый, кооперативный перенос при онлайн старом сервере).
-- Делать required core из hosted bb account / bb cloud AI (попытка account + AI gateway была откачена; AI-задачи обслуживают plugin-registered services, сегодня first-party automatic путь — Codex).
+- Automatic failover или восстановление мёртвого сервера из бэкапа как основной путь переноса (v1 server move — плановый, кооперативный перенос при онлайн старом сервере; перенос сервера на Windows-машину запрещён).
+- Требовать hosted bb account или bb cloud AI для базового локального использования (опциональный bb account открывает Connect и bb cloud AI; локальные пути Codex/Claude/Pi/ACP остаются first-class без аккаунта).
 
 ---
 
@@ -92,13 +93,13 @@ bb — это **программируемое рабочее пространс
 
 | Поверхность | Роль | Вход |
 | --- | --- | --- |
-| **Desktop app** | Рекомендуемая установка; Electron-оболочка супервизит packaged runtime и грузит web UI; helper локального редактора и desktop-браузер. | [desktop-latest](https://github.com/get-bb/bb/releases/tag/desktop-latest) / Nightly |
-| **Packaged launcher** | `npx bb-app` поднимает server + host daemon + отдаёт UI; состояние в `~/.bb/`. | `npx bb-app@latest` → `http://localhost:38886` |
-| **Web app** | Просмотр проектов/потоков/окружений; управление работой; настройки; UI плагинов; split panes. | Отдаётся сервером bb |
-| **CLI (`bb`)** | Скриптуемое управление для людей и агентов: threads, projects, machines, plugins, providers, files, server move и т.д. | `npx --package bb-app bb …` |
+| **Desktop app** | Рекомендуемая установка; Electron-оболочка супервизит packaged runtime и грузит web UI; helper локального редактора и desktop-браузер; in-app updates по умолчанию для packaged starts. | [desktop-latest](https://github.com/get-bb/bb/releases/tag/desktop-latest) / Nightly; Windows x64 installer **альфа** |
+| **Packaged launcher** | `npx bb-app` поднимает server + host daemon + отдаёт UI; состояние в `~/.bb/`; in-app updates по умолчанию для `bb-app start`. | `npx bb-app@latest` → `http://localhost:38886` |
+| **Web app** | Просмотр проектов/потоков/окружений; управление работой; настройки; UI плагинов; split panes; first-run setup guide на новых установках. | Отдаётся сервером bb |
+| **CLI (`bb`)** | Скриптуемое управление для людей и агентов: threads, projects, machines, plugins, providers, files, storage, server move и т.д. | `npx --package bb-app bb …` |
 | **SDK / HTTP API** | Программные клиенты; тот же server contract, что у приложения. | `import { BBSdk } from "bb-app"` |
-| **Mobile app** | Нативный клиент управления (Expo); сначала iOS; pairing через Direct URL или bb connect. | TestFlight / сборки из исходников |
-| **getbb.app** | Маркетинг + auth/dashboard Connect + просмотр plugin marketplace. | Cloudflare Workers (TanStack Start) |
+| **Mobile app** | Нативный клиент управления (Expo); iOS TestFlight + Android APK альфа; pairing через Direct URL или bb connect (без experiment gate). | Settings → Mobile / TestFlight / APK `android-testing` |
+| **getbb.app** | Маркетинг + auth/dashboard Connect + marketplace плагинов + Plugin Guide. | Cloudflare Workers (TanStack Start) |
 
 ### 5.1 Правила паритета поверхностей
 
@@ -135,7 +136,7 @@ bb — это **программируемое рабочее пространс
 | **Host / machine** | Долгоживущая daemon-идентичность execution-машины. Сервер работает на одном хосте (`primaryHostId`); можно enroll’ить удалённые. Project sources и environments сохраняют границу хоста. |
 | **Lifecycle owner** | Опциональный неизменяемый `lifecycleOwnerThreadId` при создании: archive/delete владельца рекурсивно затрагивает dependents (side chats, workflow workers). Независимо от sidebar `parentThreadId` и fork `sourceThreadId`. |
 | **Commands & events** | Сервер шлёт host RPC по daemon WebSocket; демоны публикуют прогресс провайдера/потока пакетами событий. Lifecycle-работа может завершаться асинхронно относительно вызывающего API. |
-| **AI services** | Plugin-registered сервисы для заголовков потоков, commit messages и voice transcription. Выбор на задачу: `automatic`, `off` или service id (Settings → AI services / `bb settings ai-services`). Ключи `BB_INFERENCE` / `BB_TRANSCRIPTION` удалены. |
+| **AI services** | Plugin-registered сервисы для заголовков потоков, commit messages и voice transcription. Выбор на задачу: `automatic`, `off` или service id (Settings → AI services / `bb settings ai-services`). Automatic сначала пробует **bb cloud** (`bb-ai`, подписанный bb account), затем остальные зарегистрированные сервисы (включая third-party) в порядке plugin/service id; Codex использует CLI-логин на primary machine. Ключи `BB_INFERENCE` / `BB_TRANSCRIPTION` удалены. |
 
 ### 6.3 Lifecycle потока (статусы)
 
@@ -184,6 +185,8 @@ bb — это **программируемое рабочее пространс
 | F-LAUNCH-5 | Must | Reload конфигурации применяет live-reloadable ключи без полного рестарта; для startup-only ключей документируется необходимость рестарта. |
 | F-LAUNCH-6 | Should | Dev-checkout’ы используют изолированные data dir и детерминированные порты, чтобы worktree могли работать рядом с packaged-инстансами. |
 | F-LAUNCH-7 | Should | Server-side вызовы package manager используют bundled npm/npx из bb, а не унаследованный PATH, чтобы install, server move и установка skills работали на машинах без Node в PATH. |
+| F-LAUNCH-8 | Should | Packaged `bb-app start` включает in-app updates по умолчанию; Settings → Updates и `bb updates app` могут применить обновление и перезапустить. |
+| F-LAUNCH-9 | Should | Новые установки открывают first-run setup guide (агент, проекты, плагины, устройства); finish/skip записывается, а Settings / `bb settings replay-onboarding` могут показать его снова. |
 
 ### 7.2 Проекты и sources
 
@@ -208,17 +211,21 @@ bb — это **программируемое рабочее пространс
 | F-THR-6 | Must | Manager-потоки координируют дочернюю работу по продуктовой политике сервера. |
 | F-THR-7 | Must | Организация sidebar (секции, порядок, свёрнутость, destinations) синхронизируется через сервер между устройствами. |
 | F-THR-8 | Should | Fork потоков (по умолчанию reuse source environment); сохранение уровня reasoning на follow-up. |
-| F-THR-9 | Must | Пагинация timeline владеет event windows и сохраняет целостность групп разговора; последний завершённый context clear — history floor. |
-| F-THR-10 | Could | Голосовой ввод через настроенный AI transcription service; сохранение неудачных записей; bb принимает записи до 25 MB (лимит сервиса Codex — 20 MB). |
+| F-THR-9 | Must | Пагинация timeline владеет event windows и сохраняет целостность групп разговора; по умолчанию последний завершённый context clear — history floor, если Settings → General `keepHistoryAfterContextClear` не оставляет более ранние сообщения видимыми над границей clear. |
+| F-THR-10 | Could | Голосовой ввод через настроенный AI transcription service; сохранение неудачных записей; bb принимает записи до 25 MB (Codex ≤20 MB, bb cloud ≤10 MB). |
 | F-THR-11 | Must | Очистка контекста агента в idle-потоке (`/clear`, `bb thread clear`) с сохранением workspace и истории до clear floor. |
 | F-THR-12 | Must | Spawn/fork могут назначить неизменяемый `lifecycleOwnerThreadId`; side chats и workflow workers назначают ownership при создании. |
 | F-THR-13 | Should | Split panes сохраняют намеренно открытые архивные потоки; overflow split dragging работает в любом направлении; результаты thread-search открываются в split pane. |
 | F-THR-14 | Should | Mentions потоков помечают relation; worktree-потоки группируются в каждом режиме организации sidebar. |
 | F-THR-15 | Should | Перетаскивание потоков из sidebar в composer создаёт mention; поиск skills поддерживает fuzzy и явные `$skill`-mentions; подсказки mentions приоритизируют связанные потоки. |
-| F-THR-16 | Should | Сохранить составленное сообщение как draft в очередь потока и отправить позже через Send now (bundled-плагин Drafts), без фиктивных scheduled-времён. |
+| F-THR-16 | Should | Сохранить составленное сообщение как draft в очередь потока и отправить позже через Send now (bundled-плагин Drafts), без фиктивных scheduled-времён; отдельной Drafts-секции в sidebar нет — drafts остаются у своего потока. |
 | F-THR-17 | Should | Handoff в новый поток из follow-up composer с любым провайдером или моделью (включая текущего провайдера); явный Exit handoff восстанавливает исходные execution-настройки, сохраняет правки draft и убирает автоматическую ссылку на источник. CLI/SDK используют `bb thread spawn` / `threads.spawn` со ссылкой на источник в prompt. |
 | F-THR-18 | Should | Отображение завершённых ходов настраивается per provider (сворачивать в строку «Worked for» или flat) с default’ами от провайдера; настройка в Settings → Providers или `bb settings completed-turns`; применяется к существующим потокам, conversation outline и `bb thread log`. |
 | F-THR-19 | Should | Вкладки панелей можно закрывать «как другие» или «все справа»; явный режим отображения diff сохраняется при изменении размеров панели. |
+| F-THR-20 | Should | Быстрые действия строк потоков и иконки footer sidebar настраиваются; layout sidebar может отличаться per tab. |
+| F-THR-21 | Should | Выбор open/collapsed для queue drawer запоминается per thread; новые очереди могут открываться по умолчанию; collapsed header показывает newest queue reason и анимированный count. |
+| F-THR-22 | Should | Карточки Approval / Ask User Question открываются по умолчанию; Ask User Question может ждать до семи дней. |
+| F-THR-23 | Should | Info panel потока показывает commits, uncommitted changes, forks и thread storage как одну list-систему (storage — дерево папок); встроенную Git shelf и кнопку Commit можно скрыть через `showGitChanges`. |
 
 ### 7.4 Окружения и workspace’ы
 
@@ -235,6 +242,7 @@ bb — это **программируемое рабочее пространс
 | F-ENV-9 | Should | Worktree-провайдер перечисляет существующие worktree в рамках проекта и хоста и adopt’ит выбранный путь без присвоения ownership: bb никогда не удаляет adopted worktree, а main checkout’ы и managed worktrees исключены из adoption. |
 | F-ENV-10 | Must | Строки destroyed environment сохраняются (не prune’ятся), чтобы последующее удаление потока всё ещё могло убрать host storage. |
 | F-ENV-11 | Should | Shared project-checkout окружения переживают отмену starting-потока, который не стал их единственным live-пользователем. |
+| F-ENV-12 | Should | Операторы могут чистить неиспользуемые окружения через `bb environment cleanup` / SDK, не удаляя окружения, на которые ещё ссылаются live-потоки. |
 
 ### 7.5 Хосты / машины
 
@@ -248,6 +256,7 @@ bb — это **программируемое рабочее пространс
 | F-HOST-6 | Should | Экспериментальный плановый перенос сервера на другую persistent-машину (`bb server move`, UI-диалог) с checklist, cutover и lock старой копии; desktop восстанавливает навигацию после moved server. |
 | F-HOST-7 | Should | Desktop-приложение поддерживает сохраняемый список адресов серверов и позволяет переключаться между This Mac / local, Connect-серверами и кастомными URL (Desktop Settings / Window → Server), не теряя прежние записи. |
 | F-HOST-8 | Must | Удаление машины может сохранить её потоки как read-only history; Connect shares удалённых хостов prune’ятся. |
+| F-HOST-9 | Should | Native Windows hosts (альфа) enroll через Windows desktop installer или `npx` в PowerShell/CMD с Git for Windows; только drive-letter paths; терминалы PowerShell; могут добавляться как remote machines; не могут быть целью server-move. |
 
 ### 7.6 Провайдеры и inference
 
@@ -255,13 +264,16 @@ bb — это **программируемое рабочее пространс
 | --- | --- | --- |
 | F-PROV-1 | Must | Запуск потоков через установленные CLI провайдеров, которые аутентифицировал пользователь (Claude Code, Codex, Pi, ACP-агенты включая Cursor). |
 | F-PROV-2 | Must | Смешивание провайдеров по потоку/задаче. |
-| F-PROV-3 | Must | Настройка AI services для titles, commit messages и voice через Settings → AI services / `bb settings ai-services` (`automatic` / `off` / service id). Automatic пробует только first-party сервисы (сегодня сначала Codex); никогда third-party плагины. Legacy-ключи `BB_INFERENCE` / `BB_TRANSCRIPTION` игнорируются/отклоняются. |
+| F-PROV-3 | Must | Настройка AI services для titles, commit messages и voice через Settings → AI services / `bb settings ai-services` (`automatic` / `off` / service id). Automatic сначала пробует bb cloud (`bb-ai`) при подписанном аккаунте, затем остальные зарегистрированные сервисы (включая third-party) в лексикографическом порядке plugin/service; выбранный сервис используется один с документированными fallback. Legacy-ключи `BB_INFERENCE` / `BB_TRANSCRIPTION` игнорируются/отклоняются. |
 | F-PROV-4 | Should | Плагин account pool ротирует аккаунты Claude/Codex при лимитах usage между машинами; вложенные bb-инстансы могут осознанно использовать Account Pooler родителя. |
 | F-PROV-5 | Should | Плагины отчётов usage и retry провайдеров; кастомные ACP-агенты могут объявить, что отдают usage, когда их диалект это поддерживает. |
 | F-PROV-6 | Must | Sign-in провайдера остаётся в терминале хоста; mobile/remote предполагают уже signed-in хост. |
 | F-PROV-7 | Must | Resumed-потоки сохраняют собственные сессии провайдера (без cross-thread mixups). |
 | F-PROV-8 | Must | Блокировать старт нового потока, если CLI выбранного провайдера отсутствует, с Install banner и объяснением восстановления. |
 | F-PROV-9 | Should | Built-in provider-плагины (Claude Code, Codex, Pi, ACP) остаются forkable вне монорепозитория по [docs/forkable-plugins.md](docs/forkable-plugins.md). |
+| F-PROV-10 | Must | Пользователи могут enable/disable отдельных провайдеров (`bb provider enable` / `disable`, Settings → Providers) без uninstall плагина; disabled-провайдеры скрыты из pickers и отклоняют новые turns. |
+| F-PROV-11 | Should | Провайдеры могут отдавать model-specific service tiers (включая Codex Ultrafast); Settings → General `allowFastServiceTier` ограничивает faster tiers для новых turns. |
+| F-PROV-12 | Should | bb cloud AI (`bb-ai`) может давать titles, commits и voice для подписанного bb account без логина Codex; `bb ai on` / `off` управляет предложением cloud AI. |
 
 ### 7.7 Файлы, редакторы, терминалы, браузеры
 
@@ -276,12 +288,14 @@ bb — это **программируемое рабочее пространс
 | F-FILE-7 | Must | Отслеживание ownership вложений и reclaim unowned uploads; CLI image/file вложения загружаются до thread-запроса, в том числе при удалённом сервере. |
 | F-FILE-8 | Should | Diff panel фильтрует файлы по path стандартными glob’ами. |
 | F-FILE-9 | Should | Desktop zoom ограничен 50–300% шагами по 10% с transient zoom indicator. |
+| F-FILE-10 | Should | File Editor предлагает явное действие Save; desktop copy идёт через один clipboard path (native в bb Desktop). |
+| F-FILE-11 | Should | Opt-in плагин Storage & retention (`bb--storage-retention`) даёт durable политики archive/delete, usage scans, orphan cleanup и CLI (`bb storage …`). |
 
 ### 7.8 Плагины, skills и marketplace
 
 | ID | Приоритет | Требование |
 | --- | --- | --- |
-| F-PLUG-1 | Must | Установка, enable/disable и настройка плагинов из UI и `bb plugin`. |
+| F-PLUG-1 | Must | Установка, enable/disable и настройка плагинов из UI и `bb plugin`; install/update могут идти в фоне, не блокируя UI. |
 | F-PLUG-2 | Must | Discovery official / community marketplace (категории, скриншоты, author pages) без установки кода при refresh; install pipeline валидирует пакеты. |
 | F-PLUG-3 | Must | Plugin SDK с документированными surfaces; новые public API members — с префиксом `experimental_` до аудита. |
 | F-PLUG-4 | Must | Skills — first-class (install, contribute instructions); отдельные workspace’ы от плагинов. |
@@ -301,9 +315,10 @@ bb — это **программируемое рабочее пространс
 | Окружения | `environment-git-worktree`, `environment-personal-workspace`, `environment-project-checkout`, `environment-modal-sandbox` (experimental) | Изолированные или облачные workspace’ы |
 | Провайдеры | `provider-claude-code`, `provider-codex`, `provider-pi`, `provider-acp`, `provider-usage`, `provider-retry`, `account-pool` | Запуск и управление backend’ами агентов |
 | Планирование / ops | `tasks`, `workflows` (opt-in), `automations`, `scheduled-send`, `concurrency-limit` | Трекинг, оркестрация, расписание работы |
-| Контекст | `memory`, `custom-instructions`, `bb-guide`, `drafts` (bundled, включён по умолчанию), `agent-annotations` | Долговременная память, guidance, сохранённые drafts, browser annotations |
+| Контекст | `memory`, `custom-instructions`, `bb-guide`, `drafts` (bundled, включён по умолчанию), `prompt-library` (bundled, выключен по умолчанию), `agent-annotations`, `bb-ai` | Долговременная память, guidance, сохранённые drafts, prompt library, browser annotations, bb cloud AI |
 | Коллаборация | `github`, `ask-user-question`, `secrets` | Issues/PR, уточняющие вопросы, secret prompts |
 | Доступ | `connect`, `push-notifications`, `keep-awake` | Remote access, push на mobile/web/desktop, поддержание хоста awake |
+| Storage | `storage-retention` (bundled, выключен по умолчанию) | Opt-in archive/delete retention и disk cleanup |
 | Shell UI | `navigation`, `thread-list` | Заменяемые sidebar navigation и thread list (Automatic предпочитает установленные forks) |
 | UX | `side-chat`, `inline-vis`, `monaco-editor`, `pdf-preview`, `theme-preview`, `browser-automation` | Более богатый UX потоков и desktop |
 
@@ -333,9 +348,10 @@ bb — это **программируемое рабочее пространс
 | F-CONN-1 | Must | Различать **browser/control устройства** и **execution-машины**. |
 | F-CONN-2 | Must | bb connect pairing сервера для account-gated remote URL; сервер владеет reconnect туннеля; Connect credential переезжает вместе с server move; клиенты переживают tunnel resets, не роняя visitors. |
 | F-CONN-3 | Must | Документированный приватный путь Tailscale Serve; предупреждение против public Funnel / неаутентифицированного wildcard bind в недоверенных сетях. |
-| F-CONN-4 | Should | Mobile pairing как connect machine (QR/код) за experiment `mobileApp` на этапе early access. |
-| F-CONN-5 | Should | Push-уведомления независимо на mobile, web и desktop (iOS, когда сервер достигает `exp.host`). |
+| F-CONN-4 | Must | Mobile pairing как connect machine (QR/код из Settings → Mobile или `bb connect machine-code`) без experiment gate; нужны signed-in bb account и плагин Connect. |
+| F-CONN-5 | Should | Push-уведомления независимо на mobile, web и desktop (iOS, когда сервер достигает `exp.host`; Android push не тестировался). |
 | F-CONN-6 | Must | Secret requests остаются живыми через bb connect и на месте в timeline. |
+| F-CONN-7 | Must | Custom DNS / reverse-proxy hostnames требуют matching `BB_APP_URL` для DNS-rebinding protection; direct IP и bb Connect продолжают работать без него. |
 
 ### 7.13 Mobile
 
@@ -343,10 +359,11 @@ bb — это **программируемое рабочее пространс
 | --- | --- | --- |
 | F-MOB-1 | Must | Нативная оболочка грузит web app сервера; нативно владеет pairing, профилями, push, deep links, share intents. |
 | F-MOB-2 | Must | Enrollment через Direct URL и bb connect. |
-| F-MOB-3 | Should | Дистрибуция iOS TestFlight; Android запланирован. |
+| F-MOB-3 | Should | Дистрибуция iOS TestFlight; Android APK альфа через публичный релиз `android-testing` / Settings → Mobile (Play store и tested Android push по-прежнему отложены). |
 | F-MOB-4 | Must | Явно недоступно на телефоне: plugin nav frontends, login провайдера, локальный editor/daemon, кастомные CSS-темы, desktop browser automation (задокументировано). |
 | F-MOB-5 | Should | Компактные layouts: typeahead над new-thread prompt; стабильная trailing-колонка sidebar; Recent-статусы выровнены с desktop; короткие быстрые свайпы открывают compact sidebar; server error pages показываются в mobile shell. |
-| F-MOB-6 | Should | Touch: оставлять клавиатуру открытой при удалении attachments в composer; не autofocus’ить new-thread composer; квадратные action buttons composer’а. |
+| F-MOB-6 | Should | Touch: оставлять клавиатуру открытой при удалении attachments в composer; не autofocus’ить new-thread composer; квадратные action buttons composer’а; mobile terminal keyboard controls. |
+| F-MOB-7 | Should | Settings → Mobile / `bb settings mobile-app` отдают актуальные ссылки iOS TestFlight и Android APK без маршрутизации APK через сервер bb. |
 
 ---
 
@@ -409,6 +426,8 @@ Production desktop и `npx bb-app` могут отправлять аноним�
 | NF-OPS-2 | Should | `bb status`, health endpoints и QA-доки для локальных debug-портов и data dirs. |
 | NF-OPS-3 | Should | `bb server move --check` показывает blockers и warnings до копирования. |
 | NF-OPS-4 | Should | `bb diagnostics cli-errors` суммирует упавшие локальные CLI-вызовы (путь команды, код ошибки и неизвестная команда/флаг; никогда значения аргументов) с `--since` / `--clear` / `--json`; CLI-ошибки предлагают валидные команды и флаги и объясняют недостающий контекст. |
+| NF-OPS-5 | Should | Opt-in server performance diagnostics требуют и startup permission (`BB_PERF_DIAGNOSTICS` / `--perf-diagnostics`), и experiment `performanceDiagnostics`. |
+| NF-OPS-6 | Should | Prompt history доступен через `bb prompt-history list` / SDK наряду с opt-in плагином Prompt Library. |
 
 ---
 
@@ -420,10 +439,10 @@ Production desktop и `npx bb-app` могут отправлять аноним�
 | macOS Intel | Через `npx bb-app` (не фокус desktop-бинарника) |
 | Linux x64 AppImage | Альфа |
 | Linux host через `npx` / source | Поддерживается |
-| Windows native | Не поддерживается |
+| Windows 11 x64 native (desktop installer / `npx`) | Альфа (нужен Git for Windows; не цель server-move) |
 | Windows + WSL2 Ubuntu | Поддерживается (все процессы bb внутри WSL2) |
 | iOS mobile | Early access / TestFlight |
-| Android mobile | Запланировано (код в основном platform-neutral; сборки не тестировались) |
+| Android mobile | Альфа APK (`android-testing` / Settings → Mobile); Play store и push не тестировались |
 | iPad | Работает phone layout |
 
 ---
@@ -432,13 +451,13 @@ Production desktop и `npx bb-app` могут отправлять аноним�
 
 Основные пользовательские объекты в UI:
 
-1. **Home / dispatch** — старт работы, недавняя активность; режимы palette для поиска и действий (включая открытие data directory).
+1. **Home / dispatch** — старт работы, недавняя активность, опциональный first-run / finish-setup checklist; режимы palette для поиска и действий (включая открытие data directory).
 2. **Projects** — sources, настройки, reorder, project-scoped env vars с унаследованными read-only строками, импорт `.env`.
-3. **Threads** — вложенный список (через плагин `thread-list`), секции, группировка worktree, живой timeline, composer (drafts, handoff), split panes, панели (diff с glob-фильтром, workflow inspector, side chat, browser previews и т.д.).
-4. **Machines** — enrolled hosts, sandbox’ы, badge server-машины, опциональный поток Move server; desktop-меню Server для сохранённых адресов; удаление машины с опцией read-only history.
-5. **Plugins / Skills** — browse marketplace, установка, настройка, отдельные workspace’ы, detail tabs; plugin safe mode.
-6. **Settings** — appearance / interface (Automatic для navigation и thread-list), providers (отображение finished turns), AI services, files/editor, environment variables, remote access (Connect), experiments, browsers, telemetry opt-out.
-7. **Plugin nav panels** — через плагин `navigation` (Tasks, GitHub, Docs, Automations и т.д.; web/desktop; не mobile frontends).
+3. **Threads** — вложенный список (через плагин `thread-list`), секции, группировка worktree, живой timeline, composer (drafts, handoff, queue), split panes, Info panel (git facts, storage tree), панели (diff с glob-фильтром, workflow inspector, side chat, browser previews и т.д.).
+4. **Machines** — enrolled hosts (включая alpha Windows), sandbox’ы, badge server-машины, опциональный поток Move server; desktop-меню Server для сохранённых адресов; удаление машины с опцией read-only history; страница Updates — одна строка на машину.
+5. **Plugins / Skills** — browse marketplace, фоновые install/update, настройка, отдельные workspace’ы, detail tabs; plugin safe mode.
+6. **Settings** — appearance / interface (Automatic для navigation и thread-list, настраиваемые row actions), providers (enable/disable, finished turns, service tiers), AI services / bb cloud AI, General (Git shelf, history после context clear, archive confirm, setup guide), files/editor, environment variables, Mobile downloads, remote access (Connect), experiments, browsers, Voice Input, telemetry opt-out.
+7. **Plugin nav panels** — через плагин `navigation` (Tasks, GitHub, Docs, Automations, Storage & retention при включении и т.д.; web/desktop; не mobile frontends).
 8. **Notification center** — пропущенные уведомления по push-каналам.
 
 ---
@@ -448,7 +467,7 @@ Production desktop и `npx bb-app` могут отправлять аноним�
 ### 11.1 Публичный automation API
 
 - HTTP-маршруты + WebSocket-уведомления по `@bb/server-contract`.
-- TypeScript `BBSdk` покрывает projects, threads (включая timeline pagination, clear, lifecycle owner на spawn/fork), environments, hosts, plugins (включая safe mode), providers, AI services, files, terminals, skills, theme, guide, status, server move (experimental) и т.д.
+- TypeScript `BBSdk` покрывает projects, threads (включая timeline pagination, clear, lifecycle owner на spawn/fork), environments (включая cleanup), hosts, plugins (включая safe mode), providers (включая enable/disable), AI services, files, terminals, skills, theme, guide, status, prompt history, storage retention при включённом плагине, metadata загрузок mobile-app, server move (experimental) и т.д.
 - Группы команд CLI зеркалят области SDK; команды плагинов проксируются через `bb`; встроенные plugin CLI используют один декларативный контракт команд (`defineCli` / `cliCommand`) с единообразным parsing, validation, help и output.
 - CLI-ошибки предлагают валидные команды и флаги, объясняют недостающий контекст и возвращают единый JSON-конверт ошибок для агентов.
 
@@ -479,12 +498,12 @@ Production desktop и `npx bb-app` могут отправлять аноним�
 
 | Ключ | Назначение |
 | --- | --- |
-| `mobileApp` | Показать mobile pairing / remote-access mobile flows на этапе early access |
 | `serverMove` | Плановый перенос роли сервера на другую persistent-машину |
-| `sidebarProgressiveDisclosure` | Плотность UX sidebar |
-| `changelogPreview` | In-app превью changelog |
+| `changelogPreview` | In-app превью changelog на Settings → Updates |
+| `navigationRail` | Постоянный левый navigation rail (desktop/web; phone/narrow оставляют drawer) |
+| `performanceDiagnostics` | UI server performance diagnostics (также нужен startup permission) |
 
-Experiments должны переключаться через Settings и `bb settings experiment`. Wording/badge/колонка Role для server-машины могут поставляться без experiment; export/cutover требуют включённый `serverMove`. Бывшие ключи `multiMachinePicker` и `timelineWindowing` удалены; multi-machine picking и ownership окон timeline — обычное продуктовое поведение.
+Experiments должны переключаться через Settings и `bb settings experiment`. Wording/badge/колонка Role для server-машины могут поставляться без experiment; export/cutover требуют включённый `serverMove`. Бывшие ключи `mobileApp`, `sidebarProgressiveDisclosure`, `multiMachinePicker` и `timelineWindowing` удалены; mobile pairing, multi-machine picking и ownership окон timeline — обычное продуктовое поведение.
 
 ---
 
@@ -497,7 +516,7 @@ Experiments должны переключаться через Settings и `bb s
 3. **Breadth** — доля установок, использующих CLI или SDK за 7 дней (качественно + сигналы поддержки).
 4. **Extensibility** — установки публичных плагинов; записи сторонних marketplace.
 5. **Reliability** — доля ошибок создания окружений, успех reconnect демона, рестарты child launcher’а, успешные cutover server move (когорта experiment).
-6. **Multi-device** — pairing Connect; mobile-сессии в когорте experiment.
+6. **Multi-device** — pairing Connect; mobile-сессии среди paired устройств.
 7. **Retention** — weekly active installs, возвращающиеся после дня 7 / дня 30.
 
 Качественный успех:
@@ -514,15 +533,16 @@ Experiments должны переключаться через Settings и `bb s
 | Риск | Смягчение |
 | --- | --- |
 | Churn CLI провайдеров ломает bridges | Provider-плагины + parity-тесты; изоляция bridges в `agent-runtime`. |
-| Злоупотребление неаутентифицированным API на `0.0.0.0` | Предупреждения в доках; loopback по умолчанию; account gating Connect. |
+| Злоупотребление неаутентифицированным API на `0.0.0.0` | Предупреждения в доках; loopback по умолчанию; account gating Connect; `BB_APP_URL` для custom DNS. |
 | Сбои установки native addon (npm 12) | Документировать `--allow-scripts`; ясное руководство по ошибке bindings-file. |
 | Рассинхрон протокола со старыми демонами | Bump `HOST_DAEMON_PROTOCOL_VERSION` форсирует обновление. |
 | Gap возможностей mobile удивляет пользователей | Явный список unsupported в platform docs и settings. |
 | Нестабильность Plugin API | Префикс `experimental_` + audit list до стабилизации. |
 | Стоимость/сложность cloud sandbox | Держать Modal и подобные плагины experimental и opt-in. |
-| Небезопасный или частичный server move | Checklist blockers, digest-checked export, health gate, lock старой копии; v1 требует онлайн source. |
+| Небезопасный или частичный server move | Checklist blockers, digest-checked export, health gate, lock старой копии; v1 требует онлайн source; Windows-цели блокируются. |
 | Сбойные third-party плагины | Plugin safe mode останавливает non-built-ins, не стирая enablement. |
-| Регрессии hosted account / connect-gate | Держать bb account + AI gateway вне required core, пока не доказаны; предпочитать локальные Codex AI services. |
+| Регрессии alpha Windows / Android | Держать alpha-метки; для production evaluation предпочитать WSL2/macOS/Linux и iOS TestFlight. |
+| Регрессии bb cloud AI / Connect account | Держать account + bb cloud AI опциональными; локальные provider CLI и Codex AI services остаются usable без getbb.app. |
 
 ---
 
@@ -530,11 +550,14 @@ Experiments должны переключаться через Settings и `bb s
 
 | Канал | Аудитория |
 | --- | --- |
-| Desktop stable | Рекомендуемые пользователи по умолчанию |
+| Desktop stable (macOS arm64) | Рекомендуемые пользователи по умолчанию |
 | Desktop Nightly | Early adopters; отдельная app identity |
-| `bb-app@latest` npm | Cross-platform / CI / WSL / Intel Mac |
+| Desktop Windows x64 | Альфа |
+| Linux AppImage | Альфа |
+| `bb-app@latest` npm | Cross-platform / CI / WSL / Intel Mac / Windows alpha |
 | `bb-app@nightly` npm | Автосборки с `main` |
 | iOS TestFlight | Mobile early access |
+| Android APK (`android-testing`) | Mobile alpha sideload |
 | Source `pnpm dev` / `pnpm start` | Контрибьюторы и advanced users |
 
 Документы релизного процесса: `docs/bb-release-process.md`, `docs/official-plugin-release-process.md`.
@@ -545,15 +568,16 @@ Experiments должны переключаться через Settings и `bb s
 
 Явно отложено или ещё формируется (не текущие Must-требования):
 
-- Нативный Windows host daemon / PowerShell product path.
-- Android store release и протестированный Android push.
+- Перевод native Windows или Android из alpha в recommended без отдельного stability pass.
+- Android Play store release и протестированный Android push.
 - Замена provider-native auth UI внутри bb.
 - Полностью hosted multi-tenant bb, заменяющий локальный SQLite по умолчанию.
 - Гарантия pixel-complete паритета plugin frontend на mobile.
 - Функции marketplace, ещё в draft (см. `docs/plugin-marketplace-plan.md`).
 - Восстановление мёртвого сервера из бэкапа и automatic failover (за пределами планового `serverMove`).
 - Перенос host-owned файлов (worktrees, checkouts, provider sessions) при relocation сервера.
-- Required hosted bb account / bb cloud AI (откачено с main после поломки connect-gate; может вернуться позже как AI-service плагин).
+- Перенос роли сервера на Windows-машину.
+- Требование hosted bb account / bb cloud AI для core product use.
 
 Согласованные будущие направления из vision:
 
@@ -561,7 +585,8 @@ Experiments должны переключаться через Settings и `bb s
 - Более глубокая командная коллаборация вокруг tasks/workflows при сохранении модели локального доверия.
 - Больше environment и machine провайдеров через стабильные plugin API.
 - Более широкое продвижение server move после hardening experiment.
-- Опциональные hosted AI services в том же AI-tasks API, не становясь единственным путём.
+- Hardening Windows desktop и Android mobile за пределами alpha.
+- Расширение опциональных hosted AI services в том же AI-tasks API, не становясь единственным путём.
 
 ---
 
@@ -577,10 +602,13 @@ Experiments должны переключаться через Settings и `bb s
 6. Телеметрия выключена в source/dev и opt-outable в production (settings и/или env); содержимое сообщений не покидает машину.
 7. Матрица поддержки платформ и ограничения mobile соответствуют поставленным артефактам.
 8. Lifecycle ownership каскадирует archive/delete для side chats и workflow workers как задокументировано; archive undo grace работает как указано.
-9. При включённом `serverMove` плановый перенос на другую enrolled persistent-машину проходит checklist → copy → health → cutover и оставляет старую копию locked как обычную машину.
+9. При включённом `serverMove` плановый перенос на другую enrolled persistent (не Windows) машину проходит checklist → copy → health → cutover и оставляет старую копию locked как обычную машину.
 10. Сохранённый draft можно позже отправить через Send now из обычной очереди, а handoff в новый поток (включая тот же провайдер) выходит обратно к исходному execution без потери правок draft.
 11. Plugin safe mode останавливает non-built-in плагины и чисто восстанавливает их при выключении.
-12. AI services для titles/commits/voice настраиваются без удалённых ключей `BB_INFERENCE` / `BB_TRANSCRIPTION`.
+12. AI services для titles/commits/voice настраиваются без удалённых ключей `BB_INFERENCE` / `BB_TRANSCRIPTION`; automatic может использовать bb cloud при signed-in, иначе fall through на другие зарегистрированные сервисы.
+13. Отдельные провайдеры можно disable/enable без uninstall плагинов; disabled-провайдеры отклоняют новые turns.
+14. Mobile pairing работает без experiment-флага; Settings → Mobile отдаёт ссылки iOS TestFlight и Android APK.
+15. Матрица поддержки платформ корректно помечает Windows desktop и Android APK как alpha.
 
 ---
 
@@ -623,9 +651,11 @@ Experiments должны переключаться через Settings и `bb s
 | **Server machine** | Хост, который сейчас держит роль сервера (`primaryHostId`) |
 | **Source** | Расположение кода проекта на конкретном хосте |
 | **Provider** | Внешний runtime coding-агента (CLI/ACP) |
-| **Drafts** | Bundled-плагин, сохраняющий составленные сообщения в обычную очередь потока для последующей отправки |
+| **Drafts** | Bundled-плагин, сохраняющий составленные сообщения в обычную очередь потока для последующей отправки (без отдельной Drafts-секции в sidebar) |
 | **Handoff** | Создание нового потока со ссылкой на исходный из follow-up composer с явным выходом для восстановления исходного execution |
 | **AI service** | Plugin-registered backend для titles, commit messages или voice transcription |
+| **bb cloud AI** | Опциональные сервисы `bb-ai` на signed-in bb account (automatic-путь для titles/commits/voice) |
+| **Storage & retention** | Opt-in bundled-плагин политик archive/delete и disk cleanup |
 | **Plugin safe mode** | Server-флаг, выгружающий каждый non-built-in установленный плагин до выключения |
 | **Forkable plugin** | Built-in, который ставится/typecheck’ится/тестируется/собирается вне монорепозитория только на публичных пакетах |
 | **Skill** | Пакет инструкций, который могут загрузить агенты |

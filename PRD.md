@@ -8,11 +8,12 @@
 | Tagline | An agentic IDE that builds itself |
 | Status | Active development (core architecture stable; workflows and surfaces evolving) |
 | License | MIT |
-| Last updated | 2026-09-25 |
-| Primary distribution | Desktop app (macOS arm64 recommended; Linux AppImage alpha), `npx bb-app@latest` / `@nightly` |
-| Companion surfaces | Web UI, `bb` CLI, TypeScript SDK / HTTP API, mobile (iOS early access), getbb.app (marketing + Connect) |
+| Last updated | 2026-10-08 |
+| Shipped baseline | **0.45.0** (see [CHANGELOG.md](CHANGELOG.md)); Nightly/`main` may be ahead |
+| Primary distribution | Desktop app (macOS arm64 recommended; Linux AppImage and Windows x64 installer alpha), `npx bb-app@latest` / `@nightly` |
+| Companion surfaces | Web UI, `bb` CLI, TypeScript SDK / HTTP API, mobile (iOS TestFlight + Android APK alpha), getbb.app (marketing + Connect + Plugin Guide) |
 | Document purpose | Capture product intent, requirements, and boundaries derived from the shipping codebase and vision |
-| Related docs | [docs/VISION.md](docs/VISION.md), [docs/system-overview.md](docs/system-overview.md), [docs/repository-overview.md](docs/repository-overview.md), [docs/server-move-plan.md](docs/server-move-plan.md), [docs/forkable-plugins.md](docs/forkable-plugins.md), [README.md](README.md) |
+| Related docs | [docs/VISION.md](docs/VISION.md), [docs/system-overview.md](docs/system-overview.md), [docs/repository-overview.md](docs/repository-overview.md), [docs/platform-support.md](docs/platform-support.md), [docs/configuration.md](docs/configuration.md), [docs/server-move-plan.md](docs/server-move-plan.md), [docs/forkable-plugins.md](docs/forkable-plugins.md), [README.md](README.md), [CHANGELOG.md](CHANGELOG.md) |
 
 ---
 
@@ -40,10 +41,10 @@ The **server is a role on one machine** (`primaryHostId`), not “the only compu
 
 - Replacing provider CLIs or owning their auth (bb uses the user’s existing authenticated providers).
 - Requiring a hosted cloud account for core local use (Connect and cloud plugins extend bb; they do not replace the local product).
-- Shipping a native Windows agent runtime (Windows is supported via Ubuntu on WSL2).
+- Treating native Windows or Android as production-recommended platforms (both ship as **alpha**; WSL2 and macOS/Linux remain the trusted host paths).
 - Making the phone a full execution host (mobile is a control surface for a bb server).
-- Automatic failover or restoring a dead server from backup as the default move path (v1 server move is a planned, cooperative move while the old server is online).
-- Shipping a hosted bb account / bb cloud AI stack as required core (an earlier account + AI gateway attempt was reverted; AI tasks are served by plugin-registered services, with Codex as the first-party automatic path today).
+- Automatic failover or restoring a dead server from backup as the default move path (v1 server move is a planned, cooperative move while the old server is online; the server cannot be moved to a Windows machine).
+- Requiring a hosted bb account or bb cloud AI for core local use (optional bb account unlocks Connect and bb cloud AI services; local Codex/Claude/Pi/ACP paths remain first-class without it).
 
 ---
 
@@ -92,13 +93,13 @@ Every surface is first-class. Capability parity is a hard product requirement un
 
 | Surface | Role | Entry |
 | --- | --- | --- |
-| **Desktop app** | Recommended install; Electron shell supervises packaged runtime and loads the web UI; local editor helper and desktop browser features. | [desktop-latest](https://github.com/get-bb/bb/releases/tag/desktop-latest) / Nightly |
-| **Packaged launcher** | `npx bb-app` starts server + host daemon + serves UI; stores state under `~/.bb/`. | `npx bb-app@latest` → `http://localhost:38886` |
-| **Web app** | Inspect projects/threads/environments; steer work; settings; plugin UI; split panes. | Served by bb server |
-| **CLI (`bb`)** | Scriptable control for users and agents: threads, projects, machines, plugins, providers, files, server move, etc. | `npx --package bb-app bb …` |
+| **Desktop app** | Recommended install; Electron shell supervises packaged runtime and loads the web UI; local editor helper and desktop browser features; in-app updates on by default for packaged starts. | [desktop-latest](https://github.com/get-bb/bb/releases/tag/desktop-latest) / Nightly; Windows x64 installer **alpha** |
+| **Packaged launcher** | `npx bb-app` starts server + host daemon + serves UI; stores state under `~/.bb/`; in-app updates on by default for `bb-app start`. | `npx bb-app@latest` → `http://localhost:38886` |
+| **Web app** | Inspect projects/threads/environments; steer work; settings; plugin UI; split panes; first-run setup guide on new installs. | Served by bb server |
+| **CLI (`bb`)** | Scriptable control for users and agents: threads, projects, machines, plugins, providers, files, storage, server move, etc. | `npx --package bb-app bb …` |
 | **SDK / HTTP API** | Programmatic clients; same server contract as the app. | `import { BBSdk } from "bb-app"` |
-| **Mobile app** | Native control client (Expo); iOS first; pairs via Direct URL or bb connect. | TestFlight / source builds |
-| **getbb.app** | Marketing + Connect auth/dashboard + plugin marketplace browsing. | Cloudflare Workers (TanStack Start) |
+| **Mobile app** | Native control client (Expo); iOS TestFlight + Android APK alpha; pairs via Direct URL or bb connect (no experiment gate). | Settings → Mobile downloads / TestFlight / `android-testing` APK |
+| **getbb.app** | Marketing + Connect auth/dashboard + plugin marketplace browsing + Plugin Guide. | Cloudflare Workers (TanStack Start) |
 
 ### 5.1 Surface parity rules
 
@@ -135,7 +136,7 @@ Wire-field changes that alter meaning, requiredness, or defaults on the daemon p
 | **Host / machine** | Long-lived daemon identity for an execution machine. The server runs on one host (`primaryHostId`); additional remote hosts can be enrolled. Project sources and environments retain the host boundary. |
 | **Lifecycle owner** | Optional immutable `lifecycleOwnerThreadId` at creation: archive/delete of the owner recursively affects dependents (side chats, workflow workers). Independent of sidebar `parentThreadId` and fork `sourceThreadId`. |
 | **Commands & events** | Server issues host RPC over the daemon WebSocket; daemons post provider/thread progress as event batches. Lifecycle work may complete asynchronously from the API caller’s perspective. |
-| **AI services** | Plugin-registered services for thread titles, commit messages, and voice transcription. Per-task choice: `automatic`, `off`, or a service id (Settings → AI services / `bb settings ai-services`). `BB_INFERENCE` / `BB_TRANSCRIPTION` config keys are removed. |
+| **AI services** | Plugin-registered services for thread titles, commit messages, and voice transcription. Per-task choice: `automatic`, `off`, or a service id (Settings → AI services / `bb settings ai-services`). Automatic tries **bb cloud** (`bb-ai`, signed-in bb account) first, then other registered services (including third-party) in plugin/service id order; Codex uses the CLI login on the primary machine. `BB_INFERENCE` / `BB_TRANSCRIPTION` config keys are removed. |
 
 ### 6.3 Thread lifecycle (statuses)
 
@@ -184,6 +185,8 @@ Requirements use MoSCoW priority: **Must** / **Should** / **Could**.
 | F-LAUNCH-5 | Must | Configuration reload applies live-reloadable keys without full restart; startup-only keys document that a restart is required. |
 | F-LAUNCH-6 | Should | Dev checkouts use isolated data dirs and deterministic ports so worktrees can run alongside packaged instances. |
 | F-LAUNCH-7 | Should | Server-side package-manager calls use bb's bundled npm/npx rather than the inherited PATH, so install, server move, and skill installs work on machines without Node on PATH. |
+| F-LAUNCH-8 | Should | Packaged `bb-app start` enables in-app updates by default; Settings → Updates and `bb updates app` can apply and restart. |
+| F-LAUNCH-9 | Should | New installs open a first-run setup guide (agent, projects, plugins, devices); finish/skip is recorded, and Settings / `bb settings replay-onboarding` can show it again. |
 
 ### 7.2 Projects and sources
 
@@ -208,17 +211,21 @@ Requirements use MoSCoW priority: **Must** / **Should** / **Could**.
 | F-THR-6 | Must | Manager threads can coordinate child work per server product policy. |
 | F-THR-7 | Must | Sidebar organization (sections, order, collapsed state, destinations) syncs via the server across devices. |
 | F-THR-8 | Should | Fork threads (reuse source environment by default); preserve reasoning level on follow-ups. |
-| F-THR-9 | Must | Timeline pagination owns event windows and keeps conversation groups coherent; latest completed context clear is the history floor. |
-| F-THR-10 | Could | Voice input via configured AI transcription service; preserve failed recordings; bb accepts recordings up to 25 MB (Codex service limit remains 20 MB). |
+| F-THR-9 | Must | Timeline pagination owns event windows and keeps conversation groups coherent; by default the latest completed context clear is the history floor, unless Settings → General `keepHistoryAfterContextClear` keeps earlier messages visible above the clear boundary. |
+| F-THR-10 | Could | Voice input via configured AI transcription service; preserve failed recordings; bb accepts recordings up to 25 MB (Codex ≤20 MB, bb cloud ≤10 MB). |
 | F-THR-11 | Must | Clear agent context in an idle thread (`/clear`, `bb thread clear`) while keeping workspace and history up to the clear floor. |
 | F-THR-12 | Must | Spawn/fork may assign immutable `lifecycleOwnerThreadId`; side chats and workflow workers assign ownership at creation. |
 | F-THR-13 | Should | Split panes keep deliberately opened archived threads; overflow split dragging works in any direction; thread-search results open in split panes. |
 | F-THR-14 | Should | Thread mentions label relation; worktree threads group in every sidebar organization mode. |
 | F-THR-15 | Should | Drag sidebar threads into a composer to mention them; skill search supports fuzzy matching and explicit `$skill` mentions; mention suggestions prioritize related threads. |
-| F-THR-16 | Should | Save a composed message as a draft into the thread queue and send it later with Send now (bundled Drafts plugin), without fake scheduled times. |
+| F-THR-16 | Should | Save a composed message as a draft into the thread queue and send it later with Send now (bundled Drafts plugin), without fake scheduled times; there is no separate Drafts sidebar section — drafts stay on their owning thread. |
 | F-THR-17 | Should | Hand off to a new thread from the follow-up composer with any provider or model (including the current provider); explicit Exit handoff restores the original execution settings, retains draft edits, and drops the automatic source reference. CLI/SDK callers use `bb thread spawn` / `threads.spawn` with the source reference in the prompt. |
 | F-THR-18 | Should | Finished-turn display is configurable per provider (collapse into a "Worked for" row or flat) with provider-declared defaults; set in Settings → Providers or `bb settings completed-turns`; applies to existing threads, the conversation outline, and `bb thread log`. |
 | F-THR-19 | Should | Panel tabs can be closed as other tabs or tabs to the right; an explicit diff display mode survives panel resizes. |
+| F-THR-20 | Should | Thread-row quick actions and sidebar footer icons are customizable; sidebar layouts can differ per tab. |
+| F-THR-21 | Should | Per-thread queue drawer open/collapsed choice is remembered; new queues can open by default; collapsed headers surface the newest queue reason and animated counts. |
+| F-THR-22 | Should | Approval / Ask User Question cards open by default when presented; Ask User Question interactions may wait up to seven days. |
+| F-THR-23 | Should | Thread Info panel presents commits, uncommitted changes, forks, and thread storage as one list system (storage as a folder tree); built-in Git shelf and Commit button can be hidden via `showGitChanges`. |
 
 ### 7.4 Environments and workspaces
 
@@ -235,6 +242,7 @@ Requirements use MoSCoW priority: **Must** / **Should** / **Could**.
 | F-ENV-9 | Should | The worktree environment provider lists existing worktrees scoped to the project and host and adopts a selected path without taking ownership: bb never deletes an adopted worktree, and main checkouts and managed worktrees are excluded from adoption. |
 | F-ENV-10 | Must | Destroyed environment rows are retained (not pruned) so later thread deletion can still remove host storage. |
 | F-ENV-11 | Should | Shared project-checkout environments survive cancellation of a starting thread that has not become their sole live user. |
+| F-ENV-12 | Should | Operators can clean unused environments via `bb environment cleanup` / SDK without deleting environments still referenced by live threads. |
 
 ### 7.5 Hosts / machines
 
@@ -248,6 +256,7 @@ Requirements use MoSCoW priority: **Must** / **Should** / **Could**.
 | F-HOST-6 | Should | Experimental planned server move to another persistent machine (`bb server move`, UI dialog) with checklist, cutover, and old-copy lock; desktop recovers navigation after a moved server. |
 | F-HOST-7 | Should | The desktop app supports a persisted list of saved server addresses and lets the user switch between This Mac / local, Connect servers, and custom URLs (Desktop Settings / Window → Server) without losing earlier entries. |
 | F-HOST-8 | Must | Removing a machine can preserve its threads as read-only history; Connect shares of removed hosts are pruned. |
+| F-HOST-9 | Should | Native Windows hosts (alpha) enroll via the Windows desktop installer or `npx` in PowerShell/CMD with Git for Windows; drive-letter paths only; PowerShell terminals; may be added as remote machines; cannot be a server-move target. |
 
 ### 7.6 Providers and inference
 
@@ -255,13 +264,16 @@ Requirements use MoSCoW priority: **Must** / **Should** / **Could**.
 | --- | --- | --- |
 | F-PROV-1 | Must | Run threads via installed provider CLIs the user authenticates (Claude Code, Codex, Pi, ACP agents including Cursor). |
 | F-PROV-2 | Must | Mix providers per thread/task. |
-| F-PROV-3 | Must | Configure AI services for titles, commit messages, and voice via Settings → AI services / `bb settings ai-services` (`automatic` / `off` / service id). Automatic tries first-party services only (Codex first today); never third-party plugins. Legacy `BB_INFERENCE` / `BB_TRANSCRIPTION` keys are ignored/refused. |
+| F-PROV-3 | Must | Configure AI services for titles, commit messages, and voice via Settings → AI services / `bb settings ai-services` (`automatic` / `off` / service id). Automatic tries bb cloud (`bb-ai`) first when the account is signed in, then other registered services (including third-party) in lexicographic plugin/service order; a picked service is used alone with documented fallbacks. Legacy `BB_INFERENCE` / `BB_TRANSCRIPTION` keys are ignored/refused. |
 | F-PROV-4 | Should | Account pool plugin rotates Claude/Codex accounts on usage limits across machines; nested bb instances can deliberately reuse the parent's Account Pooler. |
 | F-PROV-5 | Should | Provider usage reporting and retry plugins; custom ACP agents can declare that they report usage when their dialect supports it. |
 | F-PROV-6 | Must | Provider sign-in remains on the host terminal; mobile/remote assume a signed-in host. |
 | F-PROV-7 | Must | Resumed threads keep their own provider sessions (no cross-thread session mixups). |
 | F-PROV-8 | Must | Block starting a new thread when the selected provider CLI is missing, with an Install banner that explains how to recover. |
 | F-PROV-9 | Should | Built-in provider plugins (Claude Code, Codex, Pi, ACP) remain forkable outside the monorepo per [docs/forkable-plugins.md](docs/forkable-plugins.md). |
+| F-PROV-10 | Must | Users can enable/disable individual providers (`bb provider enable` / `disable`, Settings → Providers) without uninstalling the plugin; disabled providers are omitted from pickers and reject new turns. |
+| F-PROV-11 | Should | Providers may expose model-specific service tiers (including Codex Ultrafast); Settings → General `allowFastServiceTier` gates faster tiers for new turns. |
+| F-PROV-12 | Should | bb cloud AI (`bb-ai`) can supply titles, commits, and voice for a signed-in bb account without a Codex login; `bb ai on` / `off` controls whether cloud AI is offered. |
 
 ### 7.7 Files, editors, terminals, browsers
 
@@ -276,12 +288,14 @@ Requirements use MoSCoW priority: **Must** / **Should** / **Could**.
 | F-FILE-7 | Must | Track attachment ownership and reclaim unowned uploads; CLI image/file attachments upload before the thread request, including when the server is remote. |
 | F-FILE-8 | Should | Diff panel supports filtering files by path with standard globs. |
 | F-FILE-9 | Should | Desktop zoom clamps to 50–300% in 10% steps with a transient zoom indicator. |
+| F-FILE-10 | Should | File Editor offers an explicit Save action; desktop copy uses one clipboard path (native in bb Desktop). |
+| F-FILE-11 | Should | Opt-in Storage & retention plugin (`bb--storage-retention`) provides durable archive/delete policies, usage scans, orphan cleanup, and CLI (`bb storage …`). |
 
 ### 7.8 Plugins, skills, and marketplace
 
 | ID | Priority | Requirement |
 | --- | --- | --- |
-| F-PLUG-1 | Must | Install, enable/disable, and configure plugins from UI and `bb plugin`. |
+| F-PLUG-1 | Must | Install, enable/disable, and configure plugins from UI and `bb plugin`; installs and updates can run in the background without blocking the UI. |
 | F-PLUG-2 | Must | Official / community marketplace discovery (categories, screenshots, author pages) without a refresh installing code; install pipeline validates packages. |
 | F-PLUG-3 | Must | Plugin SDK with documented surfaces; new public API members are `experimental_` until audited. |
 | F-PLUG-4 | Must | Skills are first-class (install, contribute instructions); separate workspaces from plugins. |
@@ -301,9 +315,10 @@ These ship as bundled or catalog plugins; presence in the catalog is part of the
 | Environments | `environment-git-worktree`, `environment-personal-workspace`, `environment-project-checkout`, `environment-modal-sandbox` (experimental) | Isolated or cloud workspaces |
 | Providers | `provider-claude-code`, `provider-codex`, `provider-pi`, `provider-acp`, `provider-usage`, `provider-retry`, `account-pool` | Run and manage agent backends |
 | Planning / ops | `tasks`, `workflows` (opt-in), `automations`, `scheduled-send`, `concurrency-limit` | Track, orchestrate, schedule work |
-| Context | `memory`, `custom-instructions`, `bb-guide`, `drafts` (bundled, enabled by default), `agent-annotations` | Durable memory, guidance, saved drafts, browser annotations |
+| Context | `memory`, `custom-instructions`, `bb-guide`, `drafts` (bundled, enabled by default), `prompt-library` (bundled, disabled by default), `agent-annotations`, `bb-ai` | Durable memory, guidance, saved drafts, prompt library, browser annotations, bb cloud AI |
 | Collaboration | `github`, `ask-user-question`, `secrets` | Issues/PRs, clarifying questions, secret prompts |
 | Access | `connect`, `push-notifications`, `keep-awake` | Remote access, mobile/web/desktop push, host wake |
+| Storage | `storage-retention` (bundled, disabled by default) | Opt-in archive/delete retention and disk cleanup |
 | Shell UI | `navigation`, `thread-list` | Replaceable sidebar navigation and thread list (Automatic prefers installed forks) |
 | UX | `side-chat`, `inline-vis`, `monaco-editor`, `pdf-preview`, `theme-preview`, `browser-automation` | Richer thread and desktop UX |
 
@@ -333,9 +348,10 @@ These ship as bundled or catalog plugins; presence in the catalog is part of the
 | F-CONN-1 | Must | Distinguish **browser/control devices** from **execution machines**. |
 | F-CONN-2 | Must | bb connect pairs a server for account-gated remote URLs; server owns tunnel reconnect; Connect credential travels with server move; clients ride through tunnel resets instead of failing visitors. |
 | F-CONN-3 | Must | Documented private Tailscale Serve path; warn against public Funnel / unauthenticated wildcard bind on untrusted networks. |
-| F-CONN-4 | Should | Mobile pairs as a connect machine (QR/code) behind `mobileApp` experiment during early access. |
-| F-CONN-5 | Should | Push notifications to mobile, web, and desktop independently (iOS when server can reach `exp.host`). |
+| F-CONN-4 | Must | Mobile pairs as a connect machine (QR/code from Settings → Mobile or `bb connect machine-code`) without an experiment gate; requires signed-in bb account and Connect plugin. |
+| F-CONN-5 | Should | Push notifications to mobile, web, and desktop independently (iOS when server can reach `exp.host`; Android push untested). |
 | F-CONN-6 | Must | Secret requests stay alive through bb connect and remain in place in the timeline. |
+| F-CONN-7 | Must | Custom DNS / reverse-proxy hostnames require a matching `BB_APP_URL` for DNS-rebinding protection; direct IP and bb Connect continue to work without it. |
 
 ### 7.13 Mobile
 
@@ -343,10 +359,11 @@ These ship as bundled or catalog plugins; presence in the catalog is part of the
 | --- | --- | --- |
 | F-MOB-1 | Must | Native shell loads the server web app; native ownership of pairing, profiles, push, deep links, share intents. |
 | F-MOB-2 | Must | Direct URL and bb connect enrollment. |
-| F-MOB-3 | Should | iOS TestFlight distribution; Android planned. |
+| F-MOB-3 | Should | iOS TestFlight distribution; Android APK alpha via public `android-testing` release / Settings → Mobile downloads (Play store and tested Android push still deferred). |
 | F-MOB-4 | Must | Explicitly unavailable on phone: plugin nav frontends, provider login, local editor/daemon, custom CSS themes, desktop browser automation (documented). |
 | F-MOB-5 | Should | Compact layouts: typeahead above new-thread prompt; stable sidebar trailing column; Recent statuses aligned with desktop; short fast swipes open the compact sidebar; server error pages surface in the mobile shell. |
-| F-MOB-6 | Should | Touch: keep keyboard open when removing composer attachments; avoid autofocusing the new-thread composer; square composer action buttons. |
+| F-MOB-6 | Should | Touch: keep keyboard open when removing composer attachments; avoid autofocusing the new-thread composer; square composer action buttons; mobile terminal keyboard controls. |
+| F-MOB-7 | Should | Settings → Mobile / `bb settings mobile-app` expose current iOS TestFlight and Android APK download metadata without routing the APK through the bb server. |
 
 ---
 
@@ -409,6 +426,8 @@ Production desktop and `npx bb-app` may send anonymous usage events (starts, thr
 | NF-OPS-2 | Should | `bb status`, health endpoints, and QA docs for local debugging ports and data dirs. |
 | NF-OPS-3 | Should | `bb server move --check` surfaces blockers and warnings before copying. |
 | NF-OPS-4 | Should | `bb diagnostics cli-errors` tallies failed local CLI invocations (command path, error code, and unknown command/flag; never argument values) with `--since` / `--clear` / `--json`; CLI errors suggest valid commands and flags and explain missing context. |
+| NF-OPS-5 | Should | Opt-in server performance diagnostics require both startup permission (`BB_PERF_DIAGNOSTICS` / `--perf-diagnostics`) and the `performanceDiagnostics` experiment. |
+| NF-OPS-6 | Should | Prompt history is browsable via `bb prompt-history list` / SDK alongside the opt-in Prompt Library plugin. |
 
 ---
 
@@ -420,10 +439,10 @@ Production desktop and `npx bb-app` may send anonymous usage events (starts, thr
 | macOS Intel | Use `npx bb-app` (not desktop binary focus) |
 | Linux x64 AppImage | Alpha |
 | Linux host via `npx` / source | Supported |
-| Windows native | Not supported |
+| Windows 11 x64 native (desktop installer / `npx`) | Alpha (Git for Windows required; no server-move target) |
 | Windows + WSL2 Ubuntu | Supported (all bb processes inside WSL2) |
 | iOS mobile | Early access / TestFlight |
-| Android mobile | Planned (code largely platform-neutral; untested builds) |
+| Android mobile | Alpha APK (`android-testing` / Settings → Mobile); Play store and push untested |
 | iPad | Runs phone layout |
 
 ---
@@ -432,13 +451,13 @@ Production desktop and `npx bb-app` may send anonymous usage events (starts, thr
 
 Primary user objects in the UI:
 
-1. **Home / dispatch** — start work, recent activity; palette modes for search and actions (including open data directory).
+1. **Home / dispatch** — start work, recent activity, optional first-run / finish-setup checklist; palette modes for search and actions (including open data directory).
 2. **Projects** — sources, settings, reorder, project-scoped env vars with inherited read-only rows, `.env` import.
-3. **Threads** — nested list (via `thread-list` plugin), sections, worktree grouping, live timeline, composer (drafts, handoff), split panes, panels (diff with glob filter, workflow inspector, side chat, browser previews, etc.).
-4. **Machines** — enrolled hosts, sandboxes, server-machine badge, optional Move server flow; desktop Server menu for saved addresses; remove machine with read-only history option.
-5. **Plugins / Skills** — marketplace browse, install, configure, separate workspaces, detail tabs; plugin safe mode.
-6. **Settings** — appearance / interface (navigation and thread-list provider Automatic), providers (finished-turn display), AI services, files/editor, environment variables, remote access (Connect), experiments, browsers, telemetry opt-out.
-7. **Plugin nav panels** — driven by the `navigation` plugin (Tasks, GitHub, Docs, Automations, etc.; web/desktop; not mobile frontends).
+3. **Threads** — nested list (via `thread-list` plugin), sections, worktree grouping, live timeline, composer (drafts, handoff, queue), split panes, Info panel (git facts, storage tree), panels (diff with glob filter, workflow inspector, side chat, browser previews, etc.).
+4. **Machines** — enrolled hosts (including alpha Windows), sandboxes, server-machine badge, optional Move server flow; desktop Server menu for saved addresses; remove machine with read-only history option; Updates page shows one line per machine.
+5. **Plugins / Skills** — marketplace browse, background install/update, configure, separate workspaces, detail tabs; plugin safe mode.
+6. **Settings** — appearance / interface (navigation and thread-list provider Automatic, customizable row actions), providers (enable/disable, finished-turn display, service tiers), AI services / bb cloud AI, General (Git shelf, context-clear history, archive confirm, setup guide), files/editor, environment variables, Mobile downloads, remote access (Connect), experiments, browsers, Voice Input, telemetry opt-out.
+7. **Plugin nav panels** — driven by the `navigation` plugin (Tasks, GitHub, Docs, Automations, Storage & retention when enabled, etc.; web/desktop; not mobile frontends).
 8. **Notification center** — missed notifications across push channels.
 
 ---
@@ -448,7 +467,7 @@ Primary user objects in the UI:
 ### 11.1 Public automation API
 
 - HTTP routes + WebSocket notifications per `@bb/server-contract`.
-- TypeScript `BBSdk` covering projects, threads (including timeline pagination, clear, lifecycle owner on spawn/fork), environments, hosts, plugins (including safe mode), providers, AI services, files, terminals, skills, theme, guide, status, server move (experimental), etc.
+- TypeScript `BBSdk` covering projects, threads (including timeline pagination, clear, lifecycle owner on spawn/fork), environments (including cleanup), hosts, plugins (including safe mode), providers (including enable/disable), AI services, files, terminals, skills, theme, guide, status, prompt history, storage retention when the plugin is enabled, mobile-app download metadata, server move (experimental), etc.
 - CLI command groups mirror SDK areas; plugin commands proxy through `bb`; built-in plugin CLIs share one declarative command contract (`defineCli` / `cliCommand`) with consistent parsing, validation, help, and output.
 - CLI errors suggest valid commands and flags, explain missing context, and return consistent JSON error envelopes for agents.
 
@@ -479,12 +498,12 @@ Server-persisted experiment flags (defaults off):
 
 | Key | Intent |
 | --- | --- |
-| `mobileApp` | Expose mobile pairing / remote-access mobile flows during early access |
 | `serverMove` | Planned relocation of the server role to another persistent machine |
-| `sidebarProgressiveDisclosure` | Sidebar UX density |
-| `changelogPreview` | In-app changelog preview |
+| `changelogPreview` | In-app changelog preview card on Settings → Updates |
+| `navigationRail` | Persistent left navigation rail (desktop/web; phone/narrow keep drawer) |
+| `performanceDiagnostics` | Server performance diagnostics UI (also needs startup permission) |
 
-Experiments must be toggleable via Settings and `bb settings experiment`. Server-machine wording/badge/Role column may ship without the experiment; export/cutover require `serverMove` on. Former `multiMachinePicker` and `timelineWindowing` experiment keys are removed; multi-machine picking and timeline window ownership ship as ordinary product behavior.
+Experiments must be toggleable via Settings and `bb settings experiment`. Server-machine wording/badge/Role column may ship without the experiment; export/cutover require `serverMove` on. Former `mobileApp`, `sidebarProgressiveDisclosure`, `multiMachinePicker`, and `timelineWindowing` experiment keys are removed; mobile pairing, multi-machine picking, and timeline window ownership ship as ordinary product behavior.
 
 ---
 
@@ -497,7 +516,7 @@ Leading indicators (align with anonymous telemetry where available):
 3. **Breadth** — share of installs using CLI or SDK within 7 days (qualitative + support signals).
 4. **Extensibility** — public plugin installs; third-party marketplace entries.
 5. **Reliability** — rate of environment creation errors, daemon reconnect success, launcher child restarts, successful server-move cutovers (experiment cohort).
-6. **Multi-device** — Connect pairings; mobile sessions among experiment cohort.
+6. **Multi-device** — Connect pairings; mobile sessions among paired devices.
 7. **Retention** — weekly active installs returning after day 7 / day 30.
 
 Qualitative success:
@@ -514,15 +533,16 @@ Qualitative success:
 | Risk | Mitigation |
 | --- | --- |
 | Provider CLI churn breaks bridges | Provider plugins + parity tests; isolate bridges in `agent-runtime`. |
-| Unauthenticated API misuse on `0.0.0.0` | Docs warnings; default loopback; Connect account gating. |
+| Unauthenticated API misuse on `0.0.0.0` | Docs warnings; default loopback; Connect account gating; `BB_APP_URL` for custom DNS. |
 | Native addon install failures (npm 12) | Document `--allow-scripts`; clear bindings-file error guidance. |
 | Protocol skew with old daemons | `HOST_DAEMON_PROTOCOL_VERSION` bump forces update. |
 | Mobile feature gap surprises users | Explicit unsupported list in platform docs and settings. |
 | Plugin API instability | `experimental_` prefix + audit list before stabilization. |
 | Cloud sandbox cost/complexity | Keep Modal and similar plugins experimental and opt-in. |
-| Unsafe or partial server moves | Checklist blockers, digest-checked export, health gate, old-copy lock; v1 requires online source. |
+| Unsafe or partial server moves | Checklist blockers, digest-checked export, health gate, old-copy lock; v1 requires online source; block Windows targets. |
 | Misbehaving third-party plugins | Plugin safe mode stops non-built-ins without wiping enablement. |
-| Hosted account / connect-gate regressions | Keep bb account + AI gateway out of required core until proven; prefer local Codex AI services. |
+| Alpha Windows / Android regressions | Keep alpha labels; prefer WSL2/macOS/Linux and iOS TestFlight for production evaluation. |
+| bb cloud AI / Connect account regressions | Keep account + bb cloud AI optional; local provider CLIs and Codex AI services remain usable offline of getbb.app. |
 
 ---
 
@@ -530,11 +550,14 @@ Qualitative success:
 
 | Channel | Audience |
 | --- | --- |
-| Desktop stable | Default recommended users |
+| Desktop stable (macOS arm64) | Default recommended users |
 | Desktop Nightly | Early adopters; separate app identity |
-| `bb-app@latest` npm | Cross-platform / CI / WSL / Intel Mac |
+| Desktop Windows x64 | Alpha |
+| Linux AppImage | Alpha |
+| `bb-app@latest` npm | Cross-platform / CI / WSL / Intel Mac / Windows alpha |
 | `bb-app@nightly` npm | Automated builds from `main` |
 | iOS TestFlight | Mobile early access |
+| Android APK (`android-testing`) | Mobile alpha sideload |
 | Source `pnpm dev` / `pnpm start` | Contributors and advanced users |
 
 Release process docs: `docs/bb-release-process.md`, `docs/official-plugin-release-process.md`.
@@ -545,15 +568,16 @@ Release process docs: `docs/bb-release-process.md`, `docs/official-plugin-releas
 
 Explicitly deferred or emerging (not current Must requirements):
 
-- Native Windows host daemon / PowerShell product path.
-- Android store release and tested Android push.
+- Promoting native Windows or Android from alpha to recommended without a dedicated stability pass.
+- Android Play store release and tested Android push.
 - Replacing provider-native auth UIs inside bb.
 - Fully hosted multi-tenant bb that replaces local SQLite as the default.
 - Guaranteeing pixel-complete plugin frontend parity on mobile.
 - Marketplace features still in draft (see `docs/plugin-marketplace-plan.md`).
 - Dead-server restore from backup and automatic failover (beyond planned `serverMove`).
 - Moving host-owned files (worktrees, checkouts, provider sessions) during server relocation.
-- Required hosted bb account / bb cloud AI (reverted from main after connect-gate breakage; may return later behind AI-service plugins).
+- Moving the server role onto a Windows machine.
+- Requiring a hosted bb account / bb cloud AI for core product use.
 
 Aligned future directions from vision:
 
@@ -561,7 +585,8 @@ Aligned future directions from vision:
 - Deeper team collaboration around tasks/workflows while preserving local trust model.
 - More environment and machine providers via stable plugin APIs.
 - Broader promotion of server move once the experiment hardens.
-- Optional hosted AI services that plug into the same AI-tasks API without becoming the only path.
+- Hardening Windows desktop and Android mobile beyond alpha.
+- Expanding optional hosted AI services that plug into the same AI-tasks API without becoming the only path.
 
 ---
 
@@ -577,10 +602,13 @@ A release is product-complete for “core bb” when all of the following hold:
 6. Telemetry is off in source/dev and opt-outable in production (settings and/or env); no message content leaves the machine.
 7. Platform support matrix and mobile limitations are accurate for the shipped artifacts.
 8. Lifecycle ownership cascades archive/delete for side chats and workflow workers as documented; archive undo grace behaves as specified.
-9. With `serverMove` enabled, a planned move to another persistent enrolled machine completes checklist → copy → health → cutover and leaves the old copy locked as a regular machine.
+9. With `serverMove` enabled, a planned move to another persistent enrolled (non-Windows) machine completes checklist → copy → health → cutover and leaves the old copy locked as a regular machine.
 10. A saved draft can be sent later with Send now through the normal queue, and a handoff to a new thread (including within the same provider) exits back to the source execution without losing draft edits.
 11. Plugin safe mode stops non-built-in plugins and restores them cleanly when turned off.
-12. AI services for titles/commits/voice are configurable without the removed `BB_INFERENCE` / `BB_TRANSCRIPTION` keys.
+12. AI services for titles/commits/voice are configurable without the removed `BB_INFERENCE` / `BB_TRANSCRIPTION` keys; automatic can use bb cloud when signed in, otherwise falls through to other registered services.
+13. Individual providers can be disabled and re-enabled without uninstalling plugins; disabled providers reject new turns.
+14. Mobile pairing works without an experiment flag; Settings → Mobile exposes iOS TestFlight and Android APK download links.
+15. Platform support matrix accurately labels Windows desktop and Android APK as alpha.
 
 ---
 
@@ -623,9 +651,11 @@ A release is product-complete for “core bb” when all of the following hold:
 | **Server machine** | Host currently holding the server role (`primaryHostId`) |
 | **Source** | Project code location on a specific host |
 | **Provider** | External coding agent runtime (CLI/ACP) |
-| **Drafts** | Bundled plugin that saves composed messages into the normal thread queue for later sending |
+| **Drafts** | Bundled plugin that saves composed messages into the normal thread queue for later sending (no separate Drafts sidebar section) |
 | **Handoff** | Starting a new thread seeded with a reference to the source thread from the follow-up composer, explicitly exited to restore the original execution |
 | **AI service** | Plugin-registered backend for titles, commit messages, or voice transcription |
+| **bb cloud AI** | Optional `bb-ai` services backed by a signed-in bb account (automatic path for titles/commits/voice) |
+| **Storage & retention** | Opt-in bundled plugin for archive/delete policies and disk cleanup |
 | **Plugin safe mode** | Server flag that unloads every non-built-in installed plugin until turned off |
 | **Forkable plugin** | Built-in that installs/typechecks/tests/builds outside the monorepo with public packages only |
 | **Skill** | Instruction pack agents can load |
